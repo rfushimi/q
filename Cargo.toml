@@ -19,6 +19,8 @@ futures = "0.3"
 async-trait = "0.1"  # For async traits
 shellexpand = "3.1"  # For expanding shell paths
 walkdir = "2.4"      # For recursive directory listing
+regex = "1.10"       # For command pattern matching
+lazy_static = "1.4"  # For static command database
 
 [dev-dependencies]
 assert_cmd = "2.0"

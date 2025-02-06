@@ -17,6 +17,9 @@ pub enum QError {
     #[error("Context error: {0}")]
     Context(String),
 
+    #[error("Command error: {0}")]
+    Command(String),
+
     #[error("Usage error: {0}")]
     Usage(String),
 

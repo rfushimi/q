@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.h
 - File content reading support (@file)
 - Context size limits and validation
 - Integration tests for context providers
+- Implementation plan for milestone 5 (Command Suggestions)
+- Architecture Decision Record (ADR) for command suggestions
+- Commands module with database and matcher
+- Command suggestion support (@cmd)
+- Colored output for suggestions
+- Pattern matching for command queries
+- Comprehensive command database
+- Integration tests for command suggestions
 
 ### Changed
 - Updated main.rs to support async operations
@@ -36,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.h
 - Added context flags to CLI arguments
 - Improved error handling with context-specific errors
 - Enhanced prompt formatting with context injection
+- Added command suggestion flag
+- Improved error handling with command-specific errors
+- Enhanced output formatting with colored suggestions
 
 ### Deprecated
 - None
@@ -52,3 +63,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.h
 - Secure error handling to prevent key exposure
 - Safe handling of file paths in context providers
 - Size limits for context data
+- Safe pattern matching for command suggestions
