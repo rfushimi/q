@@ -13,6 +13,7 @@ use crate::context::file::FileProvider;
 use crate::context::history::HistoryProvider;
 use crate::commands::suggest::process_command_query;
 use crate::core::{QueryEngine, QueryConfig};
+use crate::config::ConfigManager;
 
 #[derive(Parser)]
 #[command(name = "q")]
@@ -90,14 +91,13 @@ impl Cli {
                 return Ok(());
             }
 
-            let home = PathBuf::from(env!("HOME"));
-            let key_path = home.join("keys").join("openai.key");
-            let api_key = std::fs::read_to_string(key_path)
-                .map_err(|e| QError::Config(format!("Failed to read API key: {}", e)))?;
-            let api_key = api_key.trim().to_string();
+            // Get API key from config
+            let config = ConfigManager::new()?;
+            let api_key = config.get_api_key(Provider::OpenAI)
+                .ok_or_else(|| QError::Config("OpenAI API key not found. Use 'q set-key openai <key>' to set it.".to_string()))?;
 
             // Create OpenAI client
-            let client = Arc::new(OpenAIClient::new(api_key));
+            let client = Arc::new(OpenAIClient::new(api_key.to_string()));
 
             // Create query engine config
             let config = QueryConfig {
