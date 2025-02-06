@@ -17,6 +17,12 @@ pub enum CoreError {
     #[error("Retry error: {0}")]
     Retry(String),
 
+    #[error("Stream error: {0}")]
+    Stream(String),
+
+    #[error("Cache error: {0}")]
+    Cache(String),
+
     #[error("Other error: {0}")]
     Other(String),
 }

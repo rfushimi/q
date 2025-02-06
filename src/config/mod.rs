@@ -12,16 +12,16 @@ pub struct ConfigManager {
 }
 
 impl ConfigManager {
-    pub fn new() -> Result<Self, QError> {
-        let paths = ConfigPaths::new()?;
+    pub fn new(verbose: bool) -> Result<Self, QError> {
+        let paths = ConfigPaths::new(verbose)?;
         // Ensure the config directory exists immediately upon creation
         paths.ensure_config_dir()?;
-        let config = Self::load_or_create_config(&paths)?;
+        let config = Self::load_or_create_config(&paths, verbose)?;
         
         Ok(Self { paths, config })
     }
 
-    fn load_or_create_config(paths: &ConfigPaths) -> Result<Config, QError> {
+    fn load_or_create_config(paths: &ConfigPaths, verbose: bool) -> Result<Config, QError> {
         if paths.config_file().exists() {
             let contents = fs::read_to_string(paths.config_file())
                 .map_err(|e| QError::Io(e))?;
@@ -41,8 +41,10 @@ impl ConfigManager {
         let toml = toml::to_string_pretty(config)
             .map_err(|e| QError::Config(format!("Failed to serialize config: {}", e)))?;
         
-        eprintln!("Debug: Saving config to {:?}", paths.config_file());
-        eprintln!("Debug: Config content:\n{}", toml);
+        if paths.verbose {
+            eprintln!("Debug: Saving config to {:?}", paths.config_file());
+            eprintln!("Debug: Config content:\n{}", toml);
+        }
         
         // Create parent directories if they don't exist
         if let Some(parent) = paths.config_file().parent() {
@@ -92,10 +94,10 @@ impl ConfigManager {
     }
 
     #[cfg(test)]
-    pub fn with_root(root: std::path::PathBuf) -> Result<Self, QError> {
+    pub fn with_root(root: std::path::PathBuf, verbose: bool) -> Result<Self, QError> {
         let paths = ConfigPaths::with_root(root);
         paths.ensure_config_dir()?;
-        let config = Self::load_or_create_config(&paths)?;
+        let config = Self::load_or_create_config(&paths, verbose)?;
         Ok(Self { paths, config })
     }
 }

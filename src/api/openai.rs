@@ -134,6 +134,10 @@ impl OpenAIClient {
         OpenAIClientBuilder::new(api_key)
     }
 
+    pub fn model(&self) -> &str {
+        &self.model
+    }
+
     fn build_request(&self, prompt: &str, stream: bool) -> ChatRequest {
         ChatRequest {
             model: self.model.clone(),
@@ -186,6 +190,10 @@ impl OpenAIClient {
 
 #[async_trait]
 impl LLMApi for OpenAIClient {
+    fn model(&self) -> &str {
+        &self.model
+    }
+
     async fn send_query(&self, prompt: &str) -> ApiResult<String> {
         let request = self.build_request(prompt, false);
         

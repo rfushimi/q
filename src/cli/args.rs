@@ -55,6 +55,10 @@ pub struct Cli {
     #[arg(long = "debug")]
     pub debug: bool,
 
+    /// Show verbose output
+    #[arg(long = "verbose", short = 'v')]
+    pub verbose: bool,
+
     /// Select LLM provider (openai or gemini)
     #[arg(long = "provider", short = 'P', default_value = "openai")]
     pub provider: String,
@@ -80,7 +84,7 @@ pub enum Commands {
 impl Cli {
     pub async fn run(&self) -> Result<(), QError> {
         if let Some(cmd) = &self.command {
-            cmd.execute()?;
+            cmd.execute(&self)?;
             return Ok(());
         }
 
@@ -100,7 +104,7 @@ impl Cli {
                 .map_err(|e| QError::Config(format!("Invalid provider: {}", e)))?;
 
             // Get API key from config
-            let config = ConfigManager::new()?;
+            let config = ConfigManager::new(self.verbose)?;
             let api_key = config.get_api_key(provider)
                 .ok_or_else(|| QError::Config(format!("{} API key not found. Use 'q set-key {} <key>' to set it.", provider, provider)))?;
 
@@ -162,13 +166,17 @@ impl Cli {
                 format!("Context:\n{}\nPrompt: {}", context.trim(), prompt)
             };
 
+            // Show connecting message with provider and model info
+            eprintln!("\x1B[90mConnecting... (provider: {}, model: gpt-3.5-turbo)\x1B[0m", provider);
+
             // Send the query through the engine
             let response = engine.query(&final_prompt)
                 .await
                 .map_err(|e| QError::Core(format!("Query failed: {}", e)))?;
 
+            // Only print response in non-streaming mode, with color
             if !self.stream {
-                println!("{}", response);
+                println!("\x1B[32m{}\x1B[0m", response);
             }
 
             return Ok(());
@@ -180,13 +188,13 @@ impl Cli {
 }
 
 impl Commands {
-    pub fn execute(&self) -> Result<(), QError> {
+    pub fn execute(&self, cli: &Cli) -> Result<(), QError> {
         match self {
             Commands::SetKey { provider, key } => {
                 let provider = Provider::try_from(provider.as_str())
                     .map_err(|e| QError::Config(e))?;
                 
-                let mut config = crate::config::ConfigManager::new()?;
+                let mut config = crate::config::ConfigManager::new(cli.verbose)?;
                 config.set_api_key(provider, key.clone())?;
                 
                 println!("API key for {} has been set successfully", provider);

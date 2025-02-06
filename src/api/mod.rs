@@ -33,6 +33,9 @@ pub trait LLMApi: Send + Sync {
 
     /// Validates the API key format and connectivity
     async fn validate_key(&self) -> ApiResult<()>;
+
+    /// Returns the model name being used
+    fn model(&self) -> &str;
 }
 
 /// Common configuration for LLM models

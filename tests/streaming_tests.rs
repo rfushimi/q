@@ -32,6 +32,10 @@ impl LLMApi for MockStreamingApi {
     async fn validate_key(&self) -> Result<(), ApiError> {
         Ok(())
     }
+
+    fn model(&self) -> &str {
+        "gpt-3.5-turbo"
+    }
 }
 
 #[tokio::test]
