@@ -7,6 +7,7 @@ DEFAULT_BIN_DIR="$HOME/.bin"
 BIN_DIR="${BIN_DIR:-$DEFAULT_BIN_DIR}"
 GITHUB_REPO="ryohei/q"
 BINARY_NAME="q"
+TEMP_DIR="/tmp/q-install"
 
 # Colors for output
 RED='\033[0;31m'
@@ -14,74 +15,43 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+# Check for required commands
+check_command() {
+    if ! command -v "$1" &> /dev/null; then
+        echo -e "${RED}Error: $1 is required but not installed.${NC}"
+        exit 1
+    fi
+}
+
+check_command "git"
+check_command "cargo"
+check_command "rustc"
+
 # Create installation directory if it doesn't exist
 mkdir -p "$BIN_DIR"
 
 echo -e "${BLUE}Installing $BINARY_NAME...${NC}"
 
-# Detect operating system and architecture
-OS="$(uname -s)"
-ARCH="$(uname -m)"
+# Clean up any existing temporary directory
+rm -rf "$TEMP_DIR"
+mkdir -p "$TEMP_DIR"
+cd "$TEMP_DIR"
 
-case $OS in
-    Linux)
-        OS="linux"
-        ;;
-    Darwin)
-        OS="darwin"
-        ;;
-    *)
-        echo -e "${RED}Error: Unsupported operating system: $OS${NC}"
-        exit 1
-        ;;
-esac
+# Clone the repository
+echo -e "${BLUE}Cloning repository...${NC}"
+git clone "https://github.com/$GITHUB_REPO.git" .
 
-case $ARCH in
-    x86_64)
-        ARCH="x86_64"
-        ;;
-    arm64|aarch64)
-        ARCH="aarch64"
-        ;;
-    *)
-        echo -e "${RED}Error: Unsupported architecture: $ARCH${NC}"
-        exit 1
-        ;;
-esac
+# Build the project
+echo -e "${BLUE}Building project...${NC}"
+cargo build --release
 
-# Get the latest release version
-LATEST_RELEASE=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-
-if [ -z "$LATEST_RELEASE" ]; then
-    echo -e "${RED}Error: Could not determine the latest release version${NC}"
-    exit 1
-fi
-
-# Download URL
-DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$LATEST_RELEASE/$BINARY_NAME-$OS-$ARCH.tar.gz"
-
-# Create temporary directory
-TMP_DIR=$(mktemp -d)
-cd "$TMP_DIR"
-
-echo "Downloading $BINARY_NAME $LATEST_RELEASE..."
-if ! curl -sL "$DOWNLOAD_URL" -o "$BINARY_NAME.tar.gz"; then
-    echo -e "${RED}Error: Failed to download $BINARY_NAME${NC}"
-    exit 1
-fi
-
-# Extract the binary
-tar xzf "$BINARY_NAME.tar.gz"
-
-# Make it executable
-chmod +x "$BINARY_NAME"
-
-# Move to installation directory
-mv "$BINARY_NAME" "$BIN_DIR/"
+# Install the binary
+echo -e "${BLUE}Installing binary...${NC}"
+cp "target/release/$BINARY_NAME" "$BIN_DIR/"
 
 # Clean up
 cd
-rm -rf "$TMP_DIR"
+rm -rf "$TEMP_DIR"
 
 echo -e "${GREEN}Successfully installed $BINARY_NAME to $BIN_DIR/$BINARY_NAME${NC}"
 
@@ -114,3 +84,9 @@ fi
 
 echo -e "${GREEN}Installation complete!${NC}"
 echo -e "${BLUE}Run 'q --help' to get started${NC}"
+
+# Print Rust version information
+echo -e "\n${BLUE}Installation details:${NC}"
+echo -e "Rust version: $(rustc --version)"
+echo -e "Cargo version: $(cargo --version)"
+echo -e "Installation directory: $BIN_DIR"

@@ -18,24 +18,26 @@ A command-line interface tool for querying Large Language Models (LLMs) with adv
 
 ## Quick Install
 
+Requirements:
+- Git
+- Rust and Cargo (install from https://rustup.rs if needed)
+
 Install with a single command:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/rfushimi/q/refs/heads/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/ryohei/q/main/install.sh | bash
 ```
 
-This will install `q` to `~/.bin/` by default. You can customize the installation directory by setting the `BIN_DIR` environment variable:
+This will:
+1. Clone the repository
+2. Build from source
+3. Install the binary to `~/.bin/` (default)
+4. Add the directory to your PATH if needed
+
+You can customize the installation directory by setting the `BIN_DIR` environment variable:
 
 ```bash
-BIN_DIR=/usr/local/bin curl -sSL https://raw.githubusercontent.com/rfushimi/q/refs/heads/main/install.sh | bash
-```
-
-## Manual Installation
-
-If you prefer to install manually using Cargo:
-
-```bash
-cargo install q
+BIN_DIR=/usr/local/bin curl -sSL https://raw.githubusercontent.com/ryohei/q/main/install.sh | bash
 ```
 
 ## Usage
