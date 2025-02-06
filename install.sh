@@ -24,8 +24,14 @@ check_command() {
 }
 
 check_command "git"
-check_command "cargo"
-check_command "rustc"
+check_command "curl"
+
+# Install Rust if not installed
+if ! command -v rustc &> /dev/null; then
+    echo -e "${BLUE}Installing Rust...${NC}"
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source "$HOME/.cargo/env"
+fi
 
 # Create installation directory if it doesn't exist
 mkdir -p "$BIN_DIR"
@@ -41,9 +47,19 @@ cd "$TEMP_DIR"
 echo -e "${BLUE}Cloning repository...${NC}"
 git clone "https://github.com/$GITHUB_REPO.git" .
 
+# Install dependencies and build the project
+echo -e "${BLUE}Installing dependencies and building project...${NC}"
+# Source cargo environment in case it was just installed
+source "$HOME/.cargo/env"
+# Update dependencies
+cargo update
 # Build the project
-echo -e "${BLUE}Building project...${NC}"
 cargo build --release
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Build failed. Please check the error messages above.${NC}"
+    exit 1
+fi
 
 # Install the binary
 echo -e "${BLUE}Installing binary...${NC}"
@@ -85,7 +101,7 @@ fi
 echo -e "${GREEN}Installation complete!${NC}"
 echo -e "${BLUE}Run 'q --help' to get started${NC}"
 
-# Print Rust version information
+# Print version information
 echo -e "\n${BLUE}Installation details:${NC}"
 echo -e "Rust version: $(rustc --version)"
 echo -e "Cargo version: $(cargo --version)"
