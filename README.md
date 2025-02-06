@@ -20,24 +20,25 @@ A command-line interface tool for querying Large Language Models (LLMs) with adv
 
 Requirements:
 - Git
-- Rust and Cargo (install from https://rustup.rs if needed)
+- Rust and Cargo (will be automatically installed if missing)
 
 Install with a single command:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/ryohei/q/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/rfushimi/q/refs/heads/main/install.sh | bash
 ```
 
 This will:
-1. Clone the repository
-2. Build from source
-3. Install the binary to `~/.bin/` (default)
-4. Add the directory to your PATH if needed
+1. Install Rust if needed
+2. Clone the repository
+3. Build from source
+4. Install the binary to `~/.bin/` (default)
+5. Add the directory to your PATH if needed
 
 You can customize the installation directory by setting the `BIN_DIR` environment variable:
 
 ```bash
-BIN_DIR=/usr/local/bin curl -sSL https://raw.githubusercontent.com/ryohei/q/main/install.sh | bash
+BIN_DIR=/usr/local/bin curl -sSL https://raw.githubusercontent.com/rfushimi/q/refs/heads/main/install.sh | bash
 ```
 
 ## Usage
@@ -102,7 +103,7 @@ Requirements:
 
 Build from source:
 ```bash
-git clone https://github.com/ryohei/q.git
+git clone https://github.com/rfushimi/q.git
 cd q
 cargo build --release
 ```

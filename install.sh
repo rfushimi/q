@@ -5,7 +5,7 @@ set -e
 # Default installation directory
 DEFAULT_BIN_DIR="$HOME/.bin"
 BIN_DIR="${BIN_DIR:-$DEFAULT_BIN_DIR}"
-GITHUB_REPO="ryohei/q"
+GITHUB_REPO="rfushimi/q"
 BINARY_NAME="q"
 TEMP_DIR="/tmp/q-install"
 
