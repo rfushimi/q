@@ -21,13 +21,13 @@ A command-line interface tool for querying Large Language Models (LLMs) with adv
 Install with a single command:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/ryohei/q/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/rfushimi/q/refs/heads/main/install.sh | bash
 ```
 
 This will install `q` to `~/.bin/` by default. You can customize the installation directory by setting the `BIN_DIR` environment variable:
 
 ```bash
-BIN_DIR=/usr/local/bin curl -sSL https://raw.githubusercontent.com/ryohei/q/main/install.sh | bash
+BIN_DIR=/usr/local/bin curl -sSL https://raw.githubusercontent.com/rfushimi/q/refs/heads/main/install.sh | bash
 ```
 
 ## Manual Installation
