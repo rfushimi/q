@@ -1,0 +1,71 @@
+## Proposed Agent Rules for the “q” CLI Project
+
+1. **Analysis-First Approach**  
+   - **Rule:** Before writing or editing any code, thoroughly read and analyze all existing files. Only proceed with implementation once you’ve drafted a complete `.MD` plan.  
+   - **Reasoning:** Ensures you don’t “jump to coding” prematurely, leading to more coherent changes that align with the Rust CLI design and the existing architecture.
+
+2. **Minimize Tool Calls**  
+   - **Rule:** Each command or file operation must be done in as few tool calls as possible. Avoid unnecessary calls (e.g., use && to connect commands).  
+   - **Reasoning:** This keeps operational costs low, aligns with the project’s efficiency goals, and prevents partial or piecemeal code fixes.
+
+3. **Safe Command Execution**  
+   - **Rule:** Only execute commands that can run non-interactively (no commands that require user input to continue). You must handle exit codes, stdout, and stderr gracefully.  
+   - **Reasoning:** Blocking for user input can cause indefinite hangs and break user workflows.
+
+4. **Documentation & ADR Updates**  
+   - **Rule:** When modifying or adding features, update relevant files:
+     - `/docs` for general documentation  
+     - `CHANGELOG.md` to track changes  
+     - `/docs/adr/` for architecture decisions if the change affects dependencies, database schemas, or major patterns  
+   - **Reasoning:** Maintains consistent project docs, ensuring that new capabilities of “q” are discoverable and that the architectural rationale is always captured.
+
+5. **Implementation Plan in `.MD`**  
+   - **Rule:** For any new feature or complex change, generate a `.MD` plan detailing the approach, impact on existing modules, and testing strategy.  
+   - **Reasoning:** Forces a structured design approach that clarifies how a change aligns with `cli`, `context`, `commands`, `api`, `config`, `core`, and `utils` modules before writing code.
+
+6. **Follow Code Style & Patterns**  
+   - **Rule:**  
+     - Use the repository pattern for data access.  
+     - Implement new LLM integrations via `api` module with a consistent trait signature.  
+     - Generate any required client code (if external APIs need stubs) using OpenAPI Generator, placing outputs under `/src/generated`.  
+     - Prefer composition over inheritance.  
+   - **Reasoning:** Prevents architectural drift and ensures the code remains clean, cohesive, and maintainable.
+
+7. **Test Coverage Requirements**  
+   - **Rule:**  
+     - Include unit tests for core logic in `core`, `commands`, and `context`.  
+     - Add integration tests for new API endpoints (OpenAI, Gemini) and for command-line use.  
+     - Write end-to-end tests for essential flows like `@hist`, `@file`, `@cmd`.  
+   - **Reasoning:** A Rust CLI can become brittle if untested; verifying logic with unit, integration, and E2E tests guarantees stable releases.
+
+8. **Error Handling & Resilience**  
+   - **Rule:** Use a standard error handling pattern (e.g., `Result<T, CustomError>`) in `utils/errors.ts` (or `.rs` if ported to Rust) and incorporate retry/backoff for network calls.  
+   - **Reasoning:** Matches the project’s stated need for robust error handling, caching, and rate-limiting in LLM queries.
+
+9. **Strict Context Usage**  
+   - **Rule:** When user references `@here`, `@hist`, or `@file`, integrate those contexts exactly as specified (pulling in directory listings, shell history, or file content). Do not inject additional context not requested by the user.  
+   - **Reasoning:** Keeps prompts efficient and ensures minimal irrelevant data is sent to the LLM, reducing token usage costs and respecting user privacy.
+
+10. **Prevent Credential Leakage**  
+   - **Rule:** Never store or expose user API keys in logs or commit them to source files. Only manage keys through the `config` module and local environment variables.  
+   - **Reasoning:** The CLI tool deals with sensitive keys for LLMs; centralizing the key handling in `config` helps maintain security and user trust.
+
+---
+
+### Why These Rules Fit the “q” CLI Project
+
+- **Modular Architecture Alignment:** The rules map directly to the modules (`cli`, `context`, `commands`, `api`, etc.) as defined in the project’s design doc, ensuring each extension or fix integrates smoothly.
+- **Documentation-Driven Development:** By mandating `.MD` implementation plans and ADRs, the team can keep track of architectural justifications, which is crucial for a multi-part CLI tool that can grow quickly with new LLM integrations.
+- **Minimal Tool Usage:** This project’s main expense is LLM queries (and associated calls), so emphasizing cost-efficient calls resonates with the stated priority to keep usage cheap and quick.
+- **Focus on Testing & Reliability:** With a CLI that might be heavily scripted, stable and predictable behavior under varying conditions (e.g., network failures) is essential, hence strong testing and error-handling guidelines.
+- **Security & Config Best Practices:** Because the CLI deals with user’s API tokens, the rules around safe handling of credentials and minimal context injection ensure privacy and trust, aligning with the project’s goal to be “secure and extensible.”
+
+---
+
+### References
+- [Clap](https://github.com/clap-rs/clap)  
+- [Reqwest](https://github.com/seanmonstar/reqwest)  
+- [Tokio](https://github.com/tokio-rs/tokio)  
+- [Config Crate](https://github.com/mehcode/config-rs)  
+- [Directories Crate](https://github.com/dirs-dev/directories-rs)  
+- [OpenAPI Generator](https://github.com/OpenAPITools/openapi-generator)
