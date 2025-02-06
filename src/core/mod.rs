@@ -136,7 +136,7 @@ impl QueryEngine {
             let client = client.clone();
             async move {
                 let result = if stream_responses {
-                    stream::handle_streaming_response(client, prompt).await
+                    self::stream::handle_streaming_response(client, prompt).await
                 } else {
                     client.send_query(prompt).await.map_err(CoreError::Api)
                 };
