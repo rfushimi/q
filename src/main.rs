@@ -6,6 +6,7 @@ mod utils;
 mod api;
 mod context;
 mod commands;
+mod core;
 
 use cli::args::Cli;
 

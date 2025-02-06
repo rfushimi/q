@@ -20,6 +20,9 @@ pub enum QError {
     #[error("Command error: {0}")]
     Command(String),
 
+    #[error("Core error: {0}")]
+    Core(String),
+
     #[error("Usage error: {0}")]
     Usage(String),
 

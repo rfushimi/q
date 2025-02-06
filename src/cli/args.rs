@@ -1,15 +1,18 @@
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
+use std::env;
+use std::sync::Arc;
+use std::time::Duration;
+
 use crate::utils::errors::QError;
 use crate::config::types::Provider;
-use crate::api::LLMApi;
 use crate::api::openai::OpenAIClient;
 use crate::context::{ContextConfig, ContextProvider};
 use crate::context::directory::DirectoryProvider;
 use crate::context::file::FileProvider;
 use crate::context::history::HistoryProvider;
 use crate::commands::suggest::process_command_query;
-use std::path::PathBuf;
-use std::env;
+use crate::core::{QueryEngine, QueryConfig};
 
 #[derive(Parser)]
 #[command(name = "q")]
@@ -34,6 +37,22 @@ pub struct Cli {
     /// Get command suggestions
     #[arg(long = "cmd", short = 'C')]
     pub cmd_suggest: bool,
+
+    /// Disable response streaming
+    #[arg(long = "no-stream")]
+    pub no_stream: bool,
+
+    /// Disable response caching
+    #[arg(long = "no-cache")]
+    pub no_cache: bool,
+
+    /// Maximum retry attempts
+    #[arg(long = "retries", default_value = "3")]
+    pub max_retries: u32,
+
+    /// Show debug information
+    #[arg(long = "debug")]
+    pub debug: bool,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -78,19 +97,29 @@ impl Cli {
             let api_key = api_key.trim().to_string();
 
             // Create OpenAI client
-            let client = OpenAIClient::new(api_key);
+            let client = Arc::new(OpenAIClient::new(api_key));
 
-            // Validate the key before using
-            client.validate_key().await
-                .map_err(|e| QError::Api(format!("API key validation failed: {}", e)))?;
+            // Create query engine config
+            let config = QueryConfig {
+                stream_responses: !self.no_stream,
+                max_retries: self.max_retries,
+                show_progress: !self.debug, // Use simple output in debug mode
+                cache_ttl: Duration::from_secs(3600),
+                max_cache_size: 1000,
+                retry_delay: Duration::from_secs(1),
+                max_retry_delay: Duration::from_secs(30),
+            };
+
+            // Create query engine
+            let mut engine = QueryEngine::new(client.clone(), config);
 
             // Gather context if requested
             let mut context = String::new();
-            let config = ContextConfig::default();
+            let context_config = ContextConfig::default();
 
             // Add shell history context
             if self.history {
-                let provider = HistoryProvider::new(config.clone());
+                let provider = HistoryProvider::new(context_config.clone());
                 let history_context = provider.get_context().await
                     .map_err(|e| QError::Context(format!("Failed to get history context: {}", e)))?;
                 context.push_str(&history_context.content);
@@ -101,7 +130,7 @@ impl Cli {
             if self.directory {
                 let current_dir = env::current_dir()
                     .map_err(|e| QError::Context(format!("Failed to get current directory: {}", e)))?;
-                let provider = DirectoryProvider::new(current_dir, config.clone());
+                let provider = DirectoryProvider::new(current_dir, context_config.clone());
                 let dir_context = provider.get_context().await
                     .map_err(|e| QError::Context(format!("Failed to get directory context: {}", e)))?;
                 context.push_str(&dir_context.content);
@@ -110,7 +139,7 @@ impl Cli {
 
             // Add file content context
             if let Some(file_path) = &self.file {
-                let provider = FileProvider::new(file_path.clone(), config.clone());
+                let provider = FileProvider::new(file_path.clone(), context_config.clone());
                 let file_context = provider.get_context().await
                     .map_err(|e| QError::Context(format!("Failed to get file context: {}", e)))?;
                 context.push_str(&file_context.content);
@@ -124,12 +153,17 @@ impl Cli {
                 format!("Context:\n{}\nPrompt: {}", context.trim(), prompt)
             };
 
-            // Send the query
-            let response = client.send_query(&final_prompt).await
-                .map_err(|e| QError::Api(format!("Query failed: {}", e)))?;
+            // Send the query through the engine
+            let response = engine.query(&final_prompt)
+                .await
+                .map_err(|e| QError::Core(format!("Query failed: {}", e)))?;
 
-            // Print the response
-            println!("{}", response);
+            if !self.no_stream {
+                println!(); // Add newline after streaming
+            } else {
+                println!("{}", response);
+            }
+
             return Ok(());
         }
 

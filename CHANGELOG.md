@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.h
 - Pattern matching for command queries
 - Comprehensive command database
 - Integration tests for command suggestions
+- Implementation plan for milestone 6 (Streaming & Resilience)
+- Architecture Decision Record (ADR) for streaming and resilience
+- Core module with streaming, retry, and cache support
+- Exponential backoff retry logic
+- Query response caching
+- Progress indicators
+- Integration tests for resilience features
 
 ### Changed
 - Updated main.rs to support async operations
@@ -47,6 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.h
 - Added command suggestion flag
 - Improved error handling with command-specific errors
 - Enhanced output formatting with colored suggestions
+- Added streaming and caching flags
+- Improved error handling with retry logic
+- Enhanced progress indication
+- Added debug mode support
 
 ### Deprecated
 - None
@@ -64,3 +75,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.h
 - Safe handling of file paths in context providers
 - Size limits for context data
 - Safe pattern matching for command suggestions
+- Safe cache size limits
+- Secure retry logic
+- Safe stream handling
