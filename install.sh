@@ -51,10 +51,14 @@ git clone "https://github.com/$GITHUB_REPO.git" .
 echo -e "${BLUE}Installing dependencies and building project...${NC}"
 # Source cargo environment in case it was just installed
 source "$HOME/.cargo/env"
+# Set release mode environment variables
+export RUSTFLAGS="-C target-cpu=native -C opt-level=3"
+export CARGO_PROFILE_RELEASE_DEBUG=0
+export CARGO_PROFILE_RELEASE_LTO=true
 # Update dependencies
 cargo update
-# Build the project
-cargo build --release
+# Build the project in release mode with optimizations
+cargo build --release --quiet
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}Build failed. Please check the error messages above.${NC}"
@@ -64,6 +68,7 @@ fi
 # Install the binary
 echo -e "${BLUE}Installing binary...${NC}"
 cp "target/release/$BINARY_NAME" "$BIN_DIR/"
+strip "$BIN_DIR/$BINARY_NAME"
 
 # Clean up
 cd
