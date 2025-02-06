@@ -117,7 +117,7 @@ src/
    - **Verification:** `$ q "Hello?"` returns a valid LLM response.
 4. **Context Injection**  
    - **Action:** Implement `@hist` (zsh history read), `@here` (directory listing), and optionally `@file`.  
-   - **Verification:** `$ q @hist "Refine this script"`, `$ q @file main.rs "Review code"`.
+   - **Verification:** `$ q @hist "explain this error"`, `$ q @file main.rs "Review code"`.
 5. **Command Suggestions**  
    - **Action:** Implement `@cmd` logic in `commands::mod`. Possibly parse the user’s question, look for "tool for X" patterns.  
    - **Verification:** `$ q @cmd "tool to profile execution time"` returns “hyperfine” in green.

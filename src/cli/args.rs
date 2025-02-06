@@ -3,7 +3,12 @@ use crate::utils::errors::QError;
 use crate::config::types::Provider;
 use crate::api::LLMApi;
 use crate::api::openai::OpenAIClient;
+use crate::context::{ContextConfig, ContextProvider, ContextType};
+use crate::context::directory::DirectoryProvider;
+use crate::context::file::FileProvider;
+use crate::context::history::HistoryProvider;
 use std::path::PathBuf;
+use std::env;
 
 #[derive(Parser)]
 #[command(name = "q")]
@@ -12,6 +17,18 @@ pub struct Cli {
     /// The prompt to send to the LLM
     #[arg(help = "The prompt to send to the LLM", value_parser = validate_prompt)]
     pub prompt: Option<String>,
+
+    /// Include shell history context
+    #[arg(long = "hist", short = 'H')]
+    pub history: bool,
+
+    /// Include current directory listing
+    #[arg(long = "here", short = 'D')]
+    pub directory: bool,
+
+    /// Include file content
+    #[arg(long = "file", short = 'F', value_name = "FILE")]
+    pub file: Option<PathBuf>,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -53,8 +70,48 @@ impl Cli {
             client.validate_key().await
                 .map_err(|e| QError::Api(format!("API key validation failed: {}", e)))?;
 
+            // Gather context if requested
+            let mut context = String::new();
+            let config = ContextConfig::default();
+
+            // Add shell history context
+            if self.history {
+                let provider = HistoryProvider::new(config.clone());
+                let history_context = provider.get_context().await
+                    .map_err(|e| QError::Context(format!("Failed to get history context: {}", e)))?;
+                context.push_str(&history_context.content);
+                context.push_str("\n\n");
+            }
+
+            // Add directory listing context
+            if self.directory {
+                let current_dir = env::current_dir()
+                    .map_err(|e| QError::Context(format!("Failed to get current directory: {}", e)))?;
+                let provider = DirectoryProvider::new(current_dir, config.clone());
+                let dir_context = provider.get_context().await
+                    .map_err(|e| QError::Context(format!("Failed to get directory context: {}", e)))?;
+                context.push_str(&dir_context.content);
+                context.push_str("\n\n");
+            }
+
+            // Add file content context
+            if let Some(file_path) = &self.file {
+                let provider = FileProvider::new(file_path.clone(), config.clone());
+                let file_context = provider.get_context().await
+                    .map_err(|e| QError::Context(format!("Failed to get file context: {}", e)))?;
+                context.push_str(&file_context.content);
+                context.push_str("\n\n");
+            }
+
+            // Build the final prompt with context
+            let final_prompt = if context.is_empty() {
+                prompt.clone()
+            } else {
+                format!("Context:\n{}\nPrompt: {}", context.trim(), prompt)
+            };
+
             // Send the query
-            let response = client.send_query(prompt).await
+            let response = client.send_query(&final_prompt).await
                 .map_err(|e| QError::Api(format!("Query failed: {}", e)))?;
 
             // Print the response

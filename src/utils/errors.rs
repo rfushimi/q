@@ -14,6 +14,9 @@ pub enum QError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error("Context error: {0}")]
+    Context(String),
+
     #[error("Usage error: {0}")]
     Usage(String),
 

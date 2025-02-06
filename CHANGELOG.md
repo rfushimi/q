@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.html).
 
 ## [Unreleased]
 
@@ -21,10 +21,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Streaming response capability
 - Integration tests for API functionality
 - Secure API key handling from external files
+- Implementation plan for milestone 4 (Context Injection)
+- Architecture Decision Record (ADR) for context injection
+- Context module with providers for history, directory, and file
+- Shell history reading support (@hist)
+- Directory listing support (@here)
+- File content reading support (@file)
+- Context size limits and validation
+- Integration tests for context providers
 
 ### Changed
 - Updated main.rs to support async operations
 - Enhanced CLI to handle basic LLM queries
+- Added context flags to CLI arguments
+- Improved error handling with context-specific errors
+- Enhanced prompt formatting with context injection
 
 ### Deprecated
 - None
@@ -39,3 +50,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API keys stored in separate files outside of git
 - Basic API key validation before usage
 - Secure error handling to prevent key exposure
+- Safe handling of file paths in context providers
+- Size limits for context data
