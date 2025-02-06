@@ -14,6 +14,9 @@ pub enum QError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error("Usage error: {0}")]
+    Usage(String),
+
     #[error("Unknown error: {0}")]
     Unknown(String),
 }

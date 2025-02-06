@@ -1,6 +1,9 @@
 use clap::{Parser, Subcommand};
 use crate::utils::errors::QError;
 use crate::config::types::Provider;
+use crate::api::LLMApi;
+use crate::api::openai::OpenAIClient;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "q")]
@@ -26,6 +29,42 @@ pub enum Commands {
         #[arg(help = "The API key to set")]
         key: String,
     },
+}
+
+impl Cli {
+    pub async fn run(&self) -> Result<(), QError> {
+        if let Some(cmd) = &self.command {
+            cmd.execute()?;
+            return Ok(());
+        }
+
+        // Handle the prompt if present
+        if let Some(prompt) = &self.prompt {
+            let home = PathBuf::from(env!("HOME"));
+            let key_path = home.join("keys").join("openai.key");
+            let api_key = std::fs::read_to_string(key_path)
+                .map_err(|e| QError::Config(format!("Failed to read API key: {}", e)))?;
+            let api_key = api_key.trim().to_string();
+
+            // Create OpenAI client
+            let client = OpenAIClient::new(api_key);
+
+            // Validate the key before using
+            client.validate_key().await
+                .map_err(|e| QError::Api(format!("API key validation failed: {}", e)))?;
+
+            // Send the query
+            let response = client.send_query(prompt).await
+                .map_err(|e| QError::Api(format!("Query failed: {}", e)))?;
+
+            // Print the response
+            println!("{}", response);
+            return Ok(());
+        }
+
+        // If we get here, no prompt was provided
+        Err(QError::Usage("No prompt provided. Use --help for usage information.".into()))
+    }
 }
 
 impl Commands {
