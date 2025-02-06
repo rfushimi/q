@@ -16,7 +16,23 @@ A command-line interface tool for querying Large Language Models (LLMs) with adv
 - 🔁 Automatic retry with exponential backoff
 - 🔒 Secure API key management
 
-## Installation
+## Quick Install
+
+Install with a single command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/ryohei/q/main/install.sh | bash
+```
+
+This will install `q` to `~/.bin/` by default. You can customize the installation directory by setting the `BIN_DIR` environment variable:
+
+```bash
+BIN_DIR=/usr/local/bin curl -sSL https://raw.githubusercontent.com/ryohei/q/main/install.sh | bash
+```
+
+## Manual Installation
+
+If you prefer to install manually using Cargo:
 
 ```bash
 cargo install q
@@ -84,7 +100,7 @@ Requirements:
 
 Build from source:
 ```bash
-git clone https://github.com/yourusername/q.git
+git clone https://github.com/ryohei/q.git
 cd q
 cargo build --release
 ```
