@@ -55,6 +55,10 @@ pub struct Cli {
     #[arg(long = "debug")]
     pub debug: bool,
 
+    /// Select LLM provider (openai or gemini)
+    #[arg(long = "provider", short = 'P', default_value = "openai")]
+    pub provider: String,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -91,10 +95,14 @@ impl Cli {
                 return Ok(());
             }
 
+            // Get provider from command line
+            let provider = Provider::try_from(self.provider.as_str())
+                .map_err(|e| QError::Config(format!("Invalid provider: {}", e)))?;
+
             // Get API key from config
             let config = ConfigManager::new()?;
-            let api_key = config.get_api_key(Provider::OpenAI)
-                .ok_or_else(|| QError::Config("OpenAI API key not found. Use 'q set-key openai <key>' to set it.".to_string()))?;
+            let api_key = config.get_api_key(provider)
+                .ok_or_else(|| QError::Config(format!("{} API key not found. Use 'q set-key {} <key>' to set it.", provider, provider)))?;
 
             // Create OpenAI client
             let client = Arc::new(OpenAIClient::new(api_key.to_string()));
