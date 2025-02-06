@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.html).
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
 ## [Unreleased]
 
@@ -44,6 +44,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.h
 - Query response caching
 - Progress indicators
 - Integration tests for resilience features
+- Robust streaming implementation with MultiProgress
+- Comprehensive streaming error handling
+- Chunked response processing for streaming
+- Unit tests for streaming functionality
+- Optional streaming mode with --stream flag
+- Progress display for non-streaming mode
 
 ### Changed
 - Updated main.rs to support async operations
@@ -58,15 +64,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.h
 - Improved error handling with retry logic
 - Enhanced progress indication
 - Added debug mode support
+- Redesigned streaming output with MultiProgress for better UX:
+  - Added three-line display with spinner, response text, and status
+  - Improved color coding (dark gray for status, green for response, blue for completion)
+  - Enhanced error presentation with red error messages
+  - Eliminated cursor jumping issues
+  - Added proper cleanup on completion or error
+- Improved streaming response handling:
+  - Added robust chunk processing
+  - Enhanced error detection in stream
+  - Added support for SSE message parsing
+  - Improved stream state management
+- Changed streaming to opt-in:
+  - Made non-streaming mode the default
+  - Added --stream flag to enable streaming output
+  - Added progress display for non-streaming mode
+  - Updated CLI help documentation
+- Enhanced non-streaming mode:
+  - Added progress spinner during response generation
+  - Added colored response output
+  - Added completion status indicator
+  - Improved error presentation
 
 ### Deprecated
 - None
 
 ### Removed
-- None
+- Old cursor manipulation-based streaming implementation
+- Manual ANSI cursor positioning code
+- Default streaming behavior (now opt-in with --stream)
 
 ### Fixed
-- None
+- Streaming output stability and readability
+- Terminal cursor positioning issues
+- Progress bar flickering during streaming
+- Error message clarity in streaming mode
+- Stream error handling and propagation
+- Chunked response processing
+- SSE message parsing reliability
+- Progress indication in non-streaming mode
+- Response formatting consistency
 
 ### Security
 - API keys stored in separate files outside of git
@@ -78,3 +115,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.h
 - Safe cache size limits
 - Secure retry logic
 - Safe stream handling
+- Secure streaming response processing

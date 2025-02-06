@@ -39,9 +39,9 @@ pub struct Cli {
     #[arg(long = "cmd", short = 'C')]
     pub cmd_suggest: bool,
 
-    /// Disable response streaming
-    #[arg(long = "no-stream")]
-    pub no_stream: bool,
+    /// Enable response streaming
+    #[arg(long = "stream")]
+    pub stream: bool,
 
     /// Disable response caching
     #[arg(long = "no-cache")]
@@ -104,12 +104,13 @@ impl Cli {
             let api_key = config.get_api_key(provider)
                 .ok_or_else(|| QError::Config(format!("{} API key not found. Use 'q set-key {} <key>' to set it.", provider, provider)))?;
 
-            // Create OpenAI client
-            let client = Arc::new(OpenAIClient::new(api_key.to_string()));
+            // Create OpenAI client with default configuration
+            let client = Arc::new(OpenAIClient::builder(api_key.to_string())
+                .build());
 
             // Create query engine config
             let config = QueryConfig {
-                stream_responses: !self.no_stream,
+                stream_responses: self.stream, // Use the new --stream flag
                 max_retries: self.max_retries,
                 show_progress: !self.debug, // Use simple output in debug mode
                 cache_ttl: Duration::from_secs(3600),
@@ -166,9 +167,7 @@ impl Cli {
                 .await
                 .map_err(|e| QError::Core(format!("Query failed: {}", e)))?;
 
-            if !self.no_stream {
-                println!(); // Add newline after streaming
-            } else {
+            if !self.stream {
                 println!("{}", response);
             }
 

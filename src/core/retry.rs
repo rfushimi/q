@@ -67,6 +67,7 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
+    use crate::api::ApiError;
 
     #[tokio::test]
     async fn test_retry_success_after_failures() {
@@ -84,7 +85,7 @@ mod tests {
             }
         };
 
-        let result = with_backoff(
+        let result: CoreResult<&str> = with_backoff(
             operation,
             3,
             Duration::from_millis(10),
@@ -102,7 +103,7 @@ mod tests {
             Err(CoreError::Retry("test error".to_string()))
         };
 
-        let result = with_backoff(
+        let result: CoreResult<&str> = with_backoff(
             operation,
             3,
             Duration::from_millis(10),
@@ -116,14 +117,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_retry() {
-        assert!(should_retry(&CoreError::Api(crate::api::ApiError::Network(
-            reqwest::Error::from(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "network error"
-            ))
-        ))));
-        assert!(should_retry(&CoreError::Api(crate::api::ApiError::RateLimit)));
-        assert!(!should_retry(&CoreError::Api(crate::api::ApiError::InvalidKey)));
+        // Create a network error using ApiError::Other
+        assert!(should_retry(&CoreError::Api(ApiError::Other("network error".into()))));
+        assert!(should_retry(&CoreError::Api(ApiError::RateLimit)));
+        assert!(!should_retry(&CoreError::Api(ApiError::InvalidKey)));
         assert!(should_retry(&CoreError::Stream("stream error".to_string())));
         assert!(!should_retry(&CoreError::Cache("cache error".to_string())));
     }

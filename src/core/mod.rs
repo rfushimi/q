@@ -4,7 +4,7 @@ pub mod cache;
 
 use std::time::Duration;
 use std::sync::Arc;
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use thiserror::Error;
 
 use crate::api::{ApiError, LLMApi};
@@ -54,7 +54,7 @@ impl Default for QueryConfig {
             max_retry_delay: Duration::from_secs(30),
             cache_ttl: Duration::from_secs(3600), // 1 hour
             max_cache_size: 1000,
-            stream_responses: true,
+            stream_responses: false, // Changed to false as default
             show_progress: true,
         }
     }
@@ -84,46 +84,93 @@ impl QueryEngine {
             return Ok(cached_response);
         }
 
-        // Setup progress if enabled
-        if self.config.show_progress {
-            self.progress = Some(self.create_progress_bar());
-        }
+        // Setup progress display
+        let multi = MultiProgress::new();
+        let spinner = multi.add(ProgressBar::new_spinner());
+        spinner.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.green} {msg}")
+                .unwrap()
+        );
+        spinner.set_message("\x1B[90mConnecting... (model: gpt-4)\x1B[0m"); // Dark gray
+        spinner.enable_steady_tick(Duration::from_millis(100));
+
+        // Create text bar for non-streaming mode
+        let text_bar = if !self.config.stream_responses {
+            let bar = multi.add(ProgressBar::new_spinner());
+            bar.set_style(
+                ProgressStyle::default_spinner()
+                    .template("{msg}")
+                    .unwrap()
+            );
+            bar.set_message("Waiting for response...");
+            Some(bar)
+        } else {
+            None
+        };
+
+        // Create done bar
+        let done_bar = multi.add(ProgressBar::new(1));
+        done_bar.set_style(
+            ProgressStyle::default_bar()
+                .template("{msg}")
+                .unwrap()
+        );
+        done_bar.set_message("");
+
+        // Spawn blocking thread for MultiProgress
+        let m = Arc::new(multi);
+        let m2 = Arc::clone(&m);
+        let handle = tokio::task::spawn_blocking(move || {
+            loop {
+                m2.draw().ok();
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        });
 
         // Send query with retry
         let client = self.client.clone();
-        let progress = self.progress.clone();
         let stream_responses = self.config.stream_responses;
 
         let operation = move || {
             let client = client.clone();
-            let progress = progress.clone();
             async move {
-                if let Some(progress) = &progress {
-                    progress.set_message("Sending query...");
-                }
-                
                 let result = if stream_responses {
                     stream::handle_streaming_response(client, prompt).await
                 } else {
                     client.send_query(prompt).await.map_err(CoreError::Api)
                 };
 
-                if result.is_ok() {
-                    if let Some(progress) = &progress {
-                        progress.finish_with_message("Done!");
-                    }
-                }
-
                 result
             }
         };
 
-        let response = retry::with_backoff(
+        let response = match retry::with_backoff(
             operation,
             self.config.max_retries,
             self.config.retry_delay,
             self.config.max_retry_delay,
-        ).await?;
+        ).await {
+            Ok(response) => {
+                spinner.finish_and_clear();
+                if let Some(text_bar) = text_bar {
+                    text_bar.finish_with_message(format!("\x1B[32m{}\x1B[0m", response));
+                }
+                done_bar.finish_with_message("\x1B[34mDone!\x1B[0m");
+                response
+            }
+            Err(e) => {
+                spinner.finish_with_message("\x1B[31mError!\x1B[0m");
+                if let Some(text_bar) = text_bar {
+                    text_bar.finish_with_message("\x1B[31mFailed to get response\x1B[0m");
+                }
+                done_bar.finish_with_message("\x1B[31mFailed: Check error above\x1B[0m");
+                return Err(e);
+            }
+        };
+
+        // Stop the progress drawing thread
+        handle.abort();
 
         // Cache successful response
         self.cache.insert(prompt.to_string(), response.clone());
@@ -148,6 +195,7 @@ mod tests {
     use super::*;
     use std::sync::Arc;
     use tokio::time::sleep;
+    use futures::stream;
 
     struct MockLLMApi {
         response: String,
@@ -160,10 +208,7 @@ mod tests {
             let fails = self.fail_count.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
             if fails > 0 {
                 sleep(Duration::from_millis(100)).await;
-                Err(ApiError::Network(reqwest::Error::from(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "mock error",
-                ))))
+                Err(ApiError::Other("mock error".into()))
             } else {
                 Ok(self.response.clone())
             }
@@ -173,8 +218,9 @@ mod tests {
             &self,
             _prompt: &str,
         ) -> Result<crate::api::StreamingResponse, ApiError> {
-            Ok(Box::pin(futures::stream::once(async move {
-                Ok(self.response.clone())
+            let response = self.response.clone();
+            Ok(Box::pin(stream::once(async move {
+                Ok(response)
             })))
         }
 
