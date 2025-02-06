@@ -77,14 +77,3 @@ impl CommandInfo {
         output
     }
 }
-
-/// Function to suggest commands based on a query
-pub async fn suggest_command(query: &str) -> CommandResult<Vec<CommandInfo>> {
-    let matches = matcher::find_matches(query)?;
-    
-    if matches.is_empty() {
-        return Err(CommandError::NoMatch);
-    }
-
-    Ok(matches)
-}

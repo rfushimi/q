@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use futures::StreamExt;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use tokio::task;
+use serde_json::Value;
 
 use crate::api::LLMApi;
 use super::{CoreError, CoreResult};
@@ -50,11 +50,46 @@ pub async fn handle_streaming_response(client: Arc<dyn LLMApi>, prompt: &str) ->
     // 4. Process stream
     while let Some(chunk) = stream.next().await {
         match chunk {
-            Ok(token) => {
-                response.push_str(&token);
-                // Color the response green
-                let colored = format!("\x1B[32m{}\x1B[0m", response);
-                text_bar.set_message(colored);
+            Ok(data) => {
+                if data.starts_with("data: ") {
+                    let json_str = &data["data: ".len()..];
+                    if json_str.trim() == "[DONE]" {
+                        continue;
+                    }
+
+                    // Try to parse as error response
+                    if let Ok(error_value) = serde_json::from_str::<Value>(json_str) {
+                        if let Some(error) = error_value.get("error") {
+                            if let Some(message) = error.get("message") {
+                                if let Some(error_msg) = message.as_str() {
+                                    spinner.finish_with_message("\x1B[31mError!\x1B[0m"); // Red error
+                                    text_bar.finish();
+                                    done_bar.set_message("\x1B[31mFailed: Check error above\x1B[0m");
+                                    done_bar.finish();
+                                    return Err(CoreError::Other(error_msg.to_string()));
+                                }
+                            }
+                        }
+                    }
+
+                    // Try to parse as stream response
+                    if let Ok(value) = serde_json::from_str::<Value>(json_str) {
+                        if let Some(choices) = value.get("choices") {
+                            if let Some(first) = choices.get(0) {
+                                if let Some(delta) = first.get("delta") {
+                                    if let Some(content) = delta.get("content") {
+                                        if let Some(token) = content.as_str() {
+                                            response.push_str(token);
+                                            // Color the response green
+                                            let colored = format!("\x1B[32m{}\x1B[0m", response);
+                                            text_bar.set_message(colored);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             Err(e) => {
                 spinner.finish_with_message("\x1B[31mError!\x1B[0m"); // Red error
@@ -115,10 +150,11 @@ mod tests {
     async fn test_streaming_response() {
         let api = Arc::new(MockStreamingApi {
             chunks: vec![
-                "Hello".to_string(),
-                ", ".to_string(),
-                "world".to_string(),
-                "!".to_string(),
+                format!("data: {{\"choices\":[{{\"delta\":{{\"content\":\"Hello\"}}}}]}}\n\n"),
+                format!("data: {{\"choices\":[{{\"delta\":{{\"content\":\", \"}}}}]}}\n\n"),
+                format!("data: {{\"choices\":[{{\"delta\":{{\"content\":\"world\"}}}}]}}\n\n"),
+                format!("data: {{\"choices\":[{{\"delta\":{{\"content\":\"!\"}}}}]}}\n\n"),
+                format!("data: [DONE]\n\n"),
             ],
         });
 
@@ -141,10 +177,10 @@ mod tests {
                 _prompt: &str,
             ) -> Result<crate::api::StreamingResponse, ApiError> {
                 let stream = stream::iter(vec![
-                    Ok("Token1 ".to_string()),
-                    Err(ApiError::Other("Simulated error".into())),
-                ]);
-                Ok(Box::pin(stream))
+                    Ok("data: {\"choices\":[{\"delta\":{\"content\":\"Token1 \"}}]}\n\n".to_string()),
+                    Ok("data: {\"error\":{\"message\":\"Simulated error\"}}\n\n".to_string()),
+                ]).boxed();
+                Ok(stream)
             }
 
             async fn validate_key(&self) -> Result<(), ApiError> {

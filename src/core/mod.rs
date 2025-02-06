@@ -14,14 +14,8 @@ pub enum CoreError {
     #[error("API error: {0}")]
     Api(#[from] ApiError),
 
-    #[error("Cache error: {0}")]
-    Cache(String),
-
     #[error("Retry error: {0}")]
     Retry(String),
-
-    #[error("Stream error: {0}")]
-    Stream(String),
 
     #[error("Other error: {0}")]
     Other(String),
@@ -118,16 +112,6 @@ impl QueryEngine {
         );
         done_bar.set_message("");
 
-        // Spawn blocking thread for MultiProgress
-        let m = Arc::new(multi);
-        let m2 = Arc::clone(&m);
-        let handle = tokio::task::spawn_blocking(move || {
-            loop {
-                m2.draw().ok();
-                std::thread::sleep(Duration::from_millis(50));
-            }
-        });
-
         // Send query with retry
         let client = self.client.clone();
         let stream_responses = self.config.stream_responses;
@@ -168,9 +152,6 @@ impl QueryEngine {
                 return Err(e);
             }
         };
-
-        // Stop the progress drawing thread
-        handle.abort();
 
         // Cache successful response
         self.cache.insert(prompt.to_string(), response.clone());
