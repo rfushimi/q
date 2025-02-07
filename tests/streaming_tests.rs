@@ -11,6 +11,10 @@ struct MockStreamingApi {
 
 #[async_trait::async_trait]
 impl LLMApi for MockStreamingApi {
+    fn model(&self) -> &str {
+        "gpt-3.5-turbo"
+    }
+
     async fn send_query(&self, _prompt: &str) -> Result<String, ApiError> {
         unimplemented!()
     }
@@ -31,10 +35,6 @@ impl LLMApi for MockStreamingApi {
 
     async fn validate_key(&self) -> Result<(), ApiError> {
         Ok(())
-    }
-
-    fn model(&self) -> &str {
-        "gpt-3.5-turbo"
     }
 }
 
@@ -62,6 +62,10 @@ async fn test_streaming_error() {
 
     #[async_trait::async_trait]
     impl LLMApi for ErrorApi {
+        fn model(&self) -> &str {
+            "gpt-3.5-turbo"
+        }
+
         async fn send_query(&self, _prompt: &str) -> Result<String, ApiError> {
             unimplemented!()
         }
