@@ -91,6 +91,8 @@ q set-key openai YOUR_API_KEY
 ```
 Options:
   -H, --hist           Include shell history context
+  -P, --provider       Select LLM provider [default: gemini]
+  -M, --model         Select model name (e.g., gemini-2.0-flash, gpt-3.5-turbo)
   -D, --here           Include current directory listing
   -F, --file <FILE>    Include file content
   -C, --cmd            Get command suggestions
@@ -98,7 +100,6 @@ Options:
       --no-cache      Disable response caching
       --retries <N>    Maximum retry attempts [default: 3]
       --debug          Show debug information
-  -P, --provider <PROVIDER>  Select LLM provider [default: openai]
   -h, --help          Print help
   -V, --version       Print version
 ```
@@ -114,6 +115,9 @@ Build from source:
 git clone https://github.com/rfushimi/q.git
 cd q
 cargo build --release
+
+# install
+cargo install --path . q
 ```
 
 Run tests:

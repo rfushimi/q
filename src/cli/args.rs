@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use crate::utils::errors::QError;
 use crate::config::types::Provider;
-use crate::api::openai::OpenAIClient;
+use crate::api::{openai::OpenAIClient, gemini::GeminiClient, LLMApi};
 use crate::context::{ContextConfig, ContextProvider};
 use crate::context::directory::DirectoryProvider;
 use crate::context::file::FileProvider;
@@ -60,8 +60,12 @@ pub struct Cli {
     pub verbose: bool,
 
     /// Select LLM provider (openai or gemini)
-    #[arg(long = "provider", short = 'P', default_value = "openai")]
+    #[arg(long = "provider", short = 'P', default_value = "gemini")]
     pub provider: String,
+
+    /// Select model name (e.g., gemini-pro, gpt-3.5-turbo)
+    #[arg(long = "model", short = 'M')]
+    pub model: Option<String>,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -149,15 +153,31 @@ impl Cli {
                 format!("Context:\n{}\nPrompt: {}", context.trim(), prompt)
             };
 
-            // Create OpenAI client with default configuration
-            let client = Arc::new(OpenAIClient::builder(api_key.to_string()).build());
+            // Create client based on provider
+            let client: Arc<dyn LLMApi> = match provider {
+                Provider::OpenAI => {
+                    let mut builder = OpenAIClient::builder(api_key.to_string());
+                    if let Some(model) = &self.model {
+                        builder = builder.with_model(model.clone());
+                    }
+                    Arc::new(builder.build())
+                }
+                Provider::Gemini => {
+                    let mut builder = GeminiClient::builder(api_key.to_string());
+                    if let Some(model) = &self.model {
+                        builder = builder.with_model(model.clone());
+                    }
+                    Arc::new(builder.build())
+                }
+            };
+
 
             // Show connecting message with provider and model info
-            eprintln!("\x1B[90mConnecting... (provider: {}, model: {})\x1B[0m", provider, client.model());
+            eprintln!("\x1B[90mprovider: {}, model: {}\x1B[0m", provider, client.model());
 
             // Create query engine config
             let config = QueryConfig {
-                stream_responses: self.stream,
+                stream_responses: false, // Always use non-streaming mode in QueryEngine
                 max_retries: self.max_retries,
                 show_progress: !self.debug,
                 cache_ttl: Duration::from_secs(3600),
@@ -174,9 +194,15 @@ impl Cli {
                 .await
                 .map_err(|e| QError::Core(format!("Query failed: {}", e)))?;
 
-            // Only print response in non-streaming mode, with color
-            if !self.stream {
-                println!("\x1B[32m{}\x1B[0m", response);
+            // Disable streaming for Gemini
+            let use_streaming = self.stream && provider != Provider::Gemini;
+            
+            // Only print response in non-streaming mode
+            if !use_streaming {
+                // Print response with color in non-streaming mode
+                // println!("\x1B[32m{}\x1B[0m", response);
+            } else {
+                // Do not print anything in streaming mode, as it's handled in core/stream.rs
             }
 
             return Ok(());
@@ -194,7 +220,7 @@ impl Commands {
                 let provider = Provider::try_from(provider.as_str())
                     .map_err(|e| QError::Config(e))?;
                 
-                let mut config = crate::config::ConfigManager::new(cli.verbose)?;
+                let mut config = ConfigManager::new(cli.verbose)?;
                 config.set_api_key(provider, key.clone())?;
                 
                 println!("API key for {} has been set successfully", provider);

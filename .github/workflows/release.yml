@@ -51,15 +51,6 @@ jobs:
           # Calculate SHA256
           sha256sum q-${{ github.ref_name }}.tar.gz > q-${{ github.ref_name }}.tar.gz.sha256
           
-      - name: Upload Source Archive
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./q-${{ github.ref_name }}.tar.gz
-          asset_name: q-${{ github.ref_name }}.tar.gz
-          asset_content_type: application/gzip
           
       - name: Upload SHA256
         uses: actions/upload-release-asset@v1

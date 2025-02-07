@@ -24,25 +24,17 @@ pub struct ApiKeys {
     pub gemini: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Settings {
-    pub default_model: String,
-    pub temperature: f32,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            default_model: "gpt-3.5-turbo".to_string(),
-            temperature: 0.7,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum Provider {
     OpenAI,
     Gemini,
+}
+
+impl Default for Provider {
+    fn default() -> Self {
+        Self::Gemini
+    }
 }
 
 impl Provider {
@@ -68,6 +60,24 @@ impl TryFrom<&str> for Provider {
             "openai" => Ok(Provider::OpenAI),
             "gemini" => Ok(Provider::Gemini),
             _ => Err(format!("Unknown provider: {}. Valid providers are: openai, gemini", s)),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Settings {
+    #[serde(default)]
+    pub default_provider: Provider,
+    pub default_model: String,
+    pub temperature: f32,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            default_provider: Provider::Gemini,
+            default_model: "gemini-pro".to_string(),
+            temperature: 0.7,
         }
     }
 }

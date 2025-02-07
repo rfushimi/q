@@ -54,7 +54,7 @@ Below is a step-by-step plan using `indicatif::MultiProgress`:
            .template("{spinner:.green} {msg}")
            .unwrap()
    );
-   spinner.set_message("Connecting... (model: gpt-4)");
+   spinner.set_message("Generating...");
    spinner.enable_steady_tick(std::time::Duration::from_millis(100));
 
    // Line 2: Text output
@@ -138,7 +138,7 @@ pub async fn handle_streaming_response(...) -> CoreResult<String> {
 
 1. **User runs**: `q "Hello?"`  
 2. **Tool**:
-   1. Sets up **spinner** on line 1: “Connecting… (model: gpt-4)”.  
+   1. Sets up **spinner** on line 1: “Connecting…”.  
    2. Starts reading from the streaming API.  
    3. Each time a token arrives, appends it to `answer_buffer` and updates line 2 with a green color.  
 3. **When done**:  

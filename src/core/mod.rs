@@ -92,7 +92,7 @@ impl QueryEngine {
                 .template("{spinner:.green} {msg}")
                 .unwrap()
         );
-        spinner.set_message("\x1B[90mConnecting... (model: gpt-4)\x1B[0m"); // Dark gray
+        spinner.set_message("\x1B[90mGenerating... \x1B[0m"); // Dark gray
         spinner.enable_steady_tick(Duration::from_millis(100));
 
         // Create text bar for non-streaming mode
@@ -103,7 +103,6 @@ impl QueryEngine {
                     .template("{msg}")
                     .unwrap()
             );
-            bar.set_message("Waiting for response...");
             Some(bar)
         } else {
             None
@@ -143,11 +142,17 @@ impl QueryEngine {
         ).await {
             Ok(response) => {
                 spinner.finish_and_clear();
-                if let Some(text_bar) = text_bar {
-                    text_bar.finish_with_message(format!("\x1B[32m{}\x1B[0m", response));
+                if !stream_responses {
+                    if let Some(text_bar) = text_bar {
+                        text_bar.finish_with_message(format!("\x1B[32m{}\x1B[0m", response));
+                    }
                 }
                 done_bar.finish_with_message("\x1B[34mDone!\x1B[0m");
-                response
+                if stream_responses {
+                    String::new() // Return empty string for streaming mode
+                } else {
+                    response
+                }
             }
             Err(e) => {
                 spinner.finish_with_message("\x1B[31mError!\x1B[0m");
@@ -191,6 +196,10 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LLMApi for MockLLMApi {
+        fn model(&self) -> &str {
+            "mock-model"
+        }
+
         async fn send_query(&self, _prompt: &str) -> Result<String, ApiError> {
             let fails = self.fail_count.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
             if fails > 0 {
