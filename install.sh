@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# Print Homebrew installation instructions
+if command -v brew &> /dev/null; then
+    echo -e "${BLUE}Homebrew detected!${NC}"
+    echo -e "${BLUE}You can install q using Homebrew with:${NC}"
+    echo -e "${GREEN}brew tap rfushimi/tap${NC}"
+    echo -e "${GREEN}brew install q${NC}"
+    echo -e "${BLUE}Or continue with manual installation...${NC}"
+    echo
+fi
+
 set -e
 
 # Default installation directory

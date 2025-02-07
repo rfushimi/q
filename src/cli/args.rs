@@ -108,23 +108,6 @@ impl Cli {
             let api_key = config.get_api_key(provider)
                 .ok_or_else(|| QError::Config(format!("{} API key not found. Use 'q set-key {} <key>' to set it.", provider, provider)))?;
 
-            // Create OpenAI client with default configuration
-            let client = Arc::new(OpenAIClient::builder(api_key.to_string())
-                .build());
-
-            // Create query engine config
-            let config = QueryConfig {
-                stream_responses: self.stream, // Use the new --stream flag
-                max_retries: self.max_retries,
-                show_progress: !self.debug, // Use simple output in debug mode
-                cache_ttl: Duration::from_secs(3600),
-                max_cache_size: 1000,
-                retry_delay: Duration::from_secs(1),
-                max_retry_delay: Duration::from_secs(30),
-            };
-
-            // Create query engine
-            let mut engine = QueryEngine::new(client.clone(), config);
 
             // Gather context if requested
             let mut context = String::new();
@@ -166,8 +149,25 @@ impl Cli {
                 format!("Context:\n{}\nPrompt: {}", context.trim(), prompt)
             };
 
+            // Create OpenAI client with default configuration
+            let client = Arc::new(OpenAIClient::builder(api_key.to_string()).build());
+
             // Show connecting message with provider and model info
-            eprintln!("\x1B[90mConnecting... (provider: {}, model: gpt-3.5-turbo)\x1B[0m", provider);
+            eprintln!("\x1B[90mConnecting... (provider: {}, model: {})\x1B[0m", provider, client.model());
+
+            // Create query engine config
+            let config = QueryConfig {
+                stream_responses: self.stream,
+                max_retries: self.max_retries,
+                show_progress: !self.debug,
+                cache_ttl: Duration::from_secs(3600),
+                max_cache_size: 1000,
+                retry_delay: Duration::from_secs(1),
+                max_retry_delay: Duration::from_secs(30),
+            };
+
+            // Create query engine
+            let mut engine = QueryEngine::new(client, config);
 
             // Send the query through the engine
             let response = engine.query(&final_prompt)

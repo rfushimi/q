@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          
+      - name: Build Release
+        run: cargo build --release
+        
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+          
+      - name: Upload Binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./target/release/q
+          asset_name: q
+          asset_content_type: application/octet-stream
+          
+      - name: Create Source Archive
+        run: |
+          # Create source tarball excluding target directory and other build artifacts
+          tar --exclude='.git' --exclude='target' --exclude='.github' -czf q-${{ github.ref_name }}.tar.gz .
+          # Calculate SHA256
+          sha256sum q-${{ github.ref_name }}.tar.gz > q-${{ github.ref_name }}.tar.gz.sha256
+          
+      - name: Upload Source Archive
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./q-${{ github.ref_name }}.tar.gz
+          asset_name: q-${{ github.ref_name }}.tar.gz
+          asset_content_type: application/gzip
+          
+      - name: Upload SHA256
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./q-${{ github.ref_name }}.tar.gz.sha256
+          asset_name: q-${{ github.ref_name }}.tar.gz.sha256
+          asset_content_type: text/plain
