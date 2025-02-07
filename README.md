@@ -17,12 +17,20 @@ A command-line interface tool for querying Large Language Models (LLMs) with adv
 - 🔒 Secure API key management
 
 ## Quick Install
-
 Requirements:
 - Git
 - Rust and Cargo (will be automatically installed if missing)
 
-Install with a single command:
+### Using Homebrew
+
+```bash
+brew tap rfushimi/tap
+brew install q
+```
+
+### Manual Installation
+
+Alternatively, you can install with a single command:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/rfushimi/q/refs/heads/main/install.sh | bash
