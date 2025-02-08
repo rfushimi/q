@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -68,7 +69,8 @@ impl TryFrom<&str> for Provider {
 pub struct Settings {
     #[serde(default)]
     pub default_provider: Provider,
-    pub default_model: String,
+    #[serde(default = "default_models")]
+    pub models: HashMap<String, String>,
     pub temperature: f32,
 }
 
@@ -76,10 +78,17 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             default_provider: Provider::Gemini,
-            default_model: "gemini-pro".to_string(),
+            models: default_models(),
             temperature: 0.7,
         }
     }
+}
+
+fn default_models() -> HashMap<String, String> {
+    let mut models = HashMap::new();
+    models.insert("openai".to_string(), "gpt-3.5-turbo".to_string());
+    models.insert("gemini".to_string(), "gemini-pro".to_string());
+    models
 }
 
 // Basic key format validation

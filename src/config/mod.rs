@@ -93,6 +93,26 @@ impl ConfigManager {
         }
     }
 
+    pub fn set_default_provider(&mut self, provider: Provider) -> Result<(), QError> {
+        self.config.settings.default_provider = provider;
+        Self::save_config(&self.paths, &self.config)
+    }
+
+    pub fn set_model(&mut self, provider: Provider, model: String) -> Result<(), QError> {
+        self.config.settings.models.insert(provider.as_str().to_string(), model);
+        Self::save_config(&self.paths, &self.config)
+    }
+
+    pub fn get_model(&self, provider: Provider) -> &str {
+        self.config.settings.models
+            .get(provider.as_str())
+            .map(String::as_str)
+            .unwrap_or_else(|| match provider {
+                Provider::OpenAI => "gpt-3.5-turbo",
+                Provider::Gemini => "gemini-pro",
+            })
+    }
+
     #[cfg(test)]
     pub fn with_root(root: std::path::PathBuf, verbose: bool) -> Result<Self, QError> {
         let paths = ConfigPaths::with_root(root);

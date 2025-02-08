@@ -83,6 +83,24 @@ pub enum Commands {
         #[arg(help = "The API key to set")]
         key: String,
     },
+
+    /// Set default LLM provider
+    SetProvider {
+        /// The LLM provider (openai or gemini)
+        #[arg(help = "The LLM provider (openai or gemini)")]
+        provider: String,
+    },
+
+    /// Set model for LLM provider
+    SetModel {
+        /// The LLM provider (openai or gemini)
+        #[arg(help = "The LLM provider (openai or gemini)")]
+        provider: String,
+
+        /// The model name to set
+        #[arg(help = "The model name to set")]
+        model: String,
+    },
 }
 
 impl Cli {
@@ -226,6 +244,26 @@ impl Commands {
                 println!("API key for {} has been set successfully", provider);
                 Ok(())
             }
+            Commands::SetProvider { provider } => {
+                let provider = Provider::try_from(provider.as_str())
+                    .map_err(|e| QError::Config(e))?;
+                
+                let mut config = ConfigManager::new(cli.verbose)?;
+                config.set_default_provider(provider)?;
+                
+                println!("Default provider has been set to {}", provider);
+                Ok(())
+            }
+            Commands::SetModel { provider, model } => {
+                let provider = Provider::try_from(provider.as_str())
+                    .map_err(|e| QError::Config(e))?;
+                
+                let mut config = ConfigManager::new(cli.verbose)?;
+                config.set_model(provider, model.clone())?;
+                
+                println!("Model for {} has been set to {}", provider, model);
+                Ok(())
+            }
         }
     }
 }
@@ -233,7 +271,7 @@ impl Commands {
 fn validate_prompt(s: &str) -> Result<String, String> {
     // If the input looks like a command (starts with '-' or contains subcommand names),
     // reject it to ensure proper error handling
-    if s.starts_with('-') || s == "set-key" {
+    if s.starts_with('-') || s == "set-key" || s == "set-provider" || s == "set-model" {
         Err(format!("'{}' is not a valid prompt. Use --help to see available commands.", s))
     } else {
         Ok(s.to_string())

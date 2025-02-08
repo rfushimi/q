@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added set-provider command to change default LLM provider
 - Initial project setup
 - Basic CLI structure using clap
 - Implementation plan for milestone 1
