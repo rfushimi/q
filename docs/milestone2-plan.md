@@ -1,4 +1,4 @@
-# Milestone 2: Config & Key Management Implementation Plan
+g# Milestone 2: Config & Key Management Implementation Plan
 
 ## Overview
 This milestone focuses on implementing configuration management and API key storage functionality. The goal is to securely store and manage API keys for LLM services using the standard OS config directory.
