@@ -20,7 +20,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: stablech
           
       - name: Build Release
         run: cargo build --release
@@ -29,9 +29,9 @@ jobs:
         id: sha
         run: |
           cd target/release
-          sha256sum q > q.sha256
-          echo "sha256=$(cat q.sha256 | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
-        
+          shasum -a 256 q > q.sha256
+          echo "sha256=$(cut -d ' ' -f 1 < q.sha256)" >> $GITHUB_OUTPUT
+          
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
