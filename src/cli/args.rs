@@ -1,10 +1,12 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
+use colored::*;
 
 use crate::utils::errors::QError;
+use crate::utils::format::format_markdown;
 use crate::config::types::Provider;
 use crate::api::{openai::OpenAIClient, gemini::GeminiClient, LLMApi};
 use crate::context::{ContextConfig, ContextProvider};
@@ -14,6 +16,22 @@ use crate::context::history::HistoryProvider;
 use crate::commands::suggest::process_command_query;
 use crate::core::{QueryEngine, QueryConfig};
 use crate::config::ConfigManager;
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum Verbosity {
+    /// Concise responses with essential information only
+    Concise,
+    /// Balanced responses with moderate detail
+    Normal,
+    /// Detailed responses with comprehensive information
+    Detailed,
+}
+
+impl Default for Verbosity {
+    fn default() -> Self {
+        Self::Concise
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "q")]
@@ -39,10 +57,6 @@ pub struct Cli {
     #[arg(long = "cmd", short = 'C')]
     pub cmd_suggest: bool,
 
-    /// Enable response streaming
-    #[arg(long = "stream")]
-    pub stream: bool,
-
     /// Disable response caching
     #[arg(long = "no-cache")]
     pub no_cache: bool,
@@ -66,6 +80,10 @@ pub struct Cli {
     /// Select model name (e.g., gemini-pro, gpt-3.5-turbo)
     #[arg(long = "model", short = 'M')]
     pub model: Option<String>,
+
+    /// Control response verbosity
+    #[arg(long = "detail", short = 'd', value_enum, default_value = "concise")]
+    pub verbosity: Verbosity,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -117,7 +135,7 @@ impl Cli {
                 let suggestions = process_command_query(prompt)
                     .await
                     .map_err(|e| QError::Command(format!("Failed to get command suggestions: {}", e)))?;
-                println!("{}", suggestions);
+                println!("{}", format_markdown(&suggestions));
                 return Ok(());
             }
 
@@ -129,7 +147,6 @@ impl Cli {
             let config = ConfigManager::new(self.verbose)?;
             let api_key = config.get_api_key(provider)
                 .ok_or_else(|| QError::Config(format!("{} API key not found. Use 'q set-key {} <key>' to set it.", provider, provider)))?;
-
 
             // Gather context if requested
             let mut context = String::new();
@@ -178,6 +195,7 @@ impl Cli {
                     if let Some(model) = &self.model {
                         builder = builder.with_model(model.clone());
                     }
+                    builder = builder.with_verbosity(self.verbosity);
                     Arc::new(builder.build())
                 }
                 Provider::Gemini => {
@@ -185,23 +203,23 @@ impl Cli {
                     if let Some(model) = &self.model {
                         builder = builder.with_model(model.clone());
                     }
+                    builder = builder.with_verbosity(self.verbosity);
                     Arc::new(builder.build())
                 }
             };
 
-
             // Show connecting message with provider and model info
-            eprintln!("\x1B[90mprovider: {}, model: {}\x1B[0m", provider, client.model());
+            eprintln!("{}", format!("provider: {}, model: {}", provider, client.model()).dimmed());
 
             // Create query engine config
             let config = QueryConfig {
-                stream_responses: false, // Always use non-streaming mode in QueryEngine
                 max_retries: self.max_retries,
                 show_progress: !self.debug,
                 cache_ttl: Duration::from_secs(3600),
                 max_cache_size: 1000,
                 retry_delay: Duration::from_secs(1),
                 max_retry_delay: Duration::from_secs(30),
+                verbosity: self.verbosity,
             };
 
             // Create query engine
@@ -212,17 +230,7 @@ impl Cli {
                 .await
                 .map_err(|e| QError::Core(format!("Query failed: {}", e)))?;
 
-            // Disable streaming for Gemini
-            let use_streaming = self.stream && provider != Provider::Gemini;
-            
-            // Only print response in non-streaming mode
-            if !use_streaming {
-                // Print response with color in non-streaming mode
-                // println!("\x1B[32m{}\x1B[0m", response);
-            } else {
-                // Do not print anything in streaming mode, as it's handled in core/stream.rs
-            }
-
+            println!("{}", format_markdown(&response));
             return Ok(());
         }
 
@@ -241,7 +249,7 @@ impl Commands {
                 let mut config = ConfigManager::new(cli.verbose)?;
                 config.set_api_key(provider, key.clone())?;
                 
-                println!("API key for {} has been set successfully", provider);
+                println!("{}", format_markdown(&format!("# API key for {} has been set successfully", provider)));
                 Ok(())
             }
             Commands::SetProvider { provider } => {
@@ -251,7 +259,7 @@ impl Commands {
                 let mut config = ConfigManager::new(cli.verbose)?;
                 config.set_default_provider(provider)?;
                 
-                println!("Default provider has been set to {}", provider);
+                println!("{}", format_markdown(&format!("# Default provider has been set to {}", provider)));
                 Ok(())
             }
             Commands::SetModel { provider, model } => {
@@ -261,7 +269,7 @@ impl Commands {
                 let mut config = ConfigManager::new(cli.verbose)?;
                 config.set_model(provider, model.clone())?;
                 
-                println!("Model for {} has been set to {}", provider, model);
+                println!("{}", format_markdown(&format!("# Model for {} has been set to {}", provider, model)));
                 Ok(())
             }
         }

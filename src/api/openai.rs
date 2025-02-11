@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use super::{ApiError, ApiResult, LLMApi, ModelConfig, StreamingResponse};
+use crate::cli::args::Verbosity;
 
 const DEFAULT_API_URL: &str = "https://api.openai.com/v1/chat/completions";
 const DEFAULT_MODEL: &str = "gpt-3.5-turbo";
@@ -17,6 +18,7 @@ pub struct OpenAIClient {
     api_url: String,
     model: String,
     config: ModelConfig,
+    verbosity: Verbosity,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -78,6 +80,7 @@ pub struct OpenAIClientBuilder {
     api_url: String,
     model: String,
     config: ModelConfig,
+    verbosity: Verbosity,
 }
 
 impl OpenAIClientBuilder {
@@ -87,6 +90,7 @@ impl OpenAIClientBuilder {
             api_url: DEFAULT_API_URL.to_string(),
             model: DEFAULT_MODEL.to_string(),
             config: ModelConfig::default(),
+            verbosity: Verbosity::default(),
         }
     }
 
@@ -102,6 +106,11 @@ impl OpenAIClientBuilder {
 
     pub fn with_config(mut self, config: ModelConfig) -> Self {
         self.config = config;
+        self
+    }
+
+    pub fn with_verbosity(mut self, verbosity: Verbosity) -> Self {
+        self.verbosity = verbosity;
         self
     }
 
@@ -125,6 +134,7 @@ impl OpenAIClientBuilder {
             api_url: self.api_url,
             model: self.model,
             config: self.config,
+            verbosity: self.verbosity,
         }
     }
 }
@@ -138,13 +148,27 @@ impl OpenAIClient {
         &self.model
     }
 
+    fn get_system_prompt(&self) -> &str {
+        match self.verbosity {
+            Verbosity::Concise => "You are a helpful assistant. Be concise and to the point. Provide only essential information without unnecessary details or explanations.",
+            Verbosity::Normal => "You are a helpful assistant. Provide balanced responses with moderate detail.",
+            Verbosity::Detailed => "You are a helpful assistant. Provide detailed and comprehensive responses with thorough explanations and examples where appropriate.",
+        }
+    }
+
     fn build_request(&self, prompt: &str, stream: bool) -> ChatRequest {
         ChatRequest {
             model: self.model.clone(),
-            messages: vec![ChatMessage {
-                role: "user".to_string(),
-                content: prompt.to_string(),
-            }],
+            messages: vec![
+                ChatMessage {
+                    role: "system".to_string(),
+                    content: self.get_system_prompt().to_string(),
+                },
+                ChatMessage {
+                    role: "user".to_string(),
+                    content: prompt.to_string(),
+                },
+            ],
             temperature: self.config.temperature,
             max_tokens: self.config.max_tokens,
             stream,

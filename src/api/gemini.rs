@@ -5,9 +5,10 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use super::{ApiError, ApiResult, LLMApi, ModelConfig, StreamingResponse};
+use crate::cli::args::Verbosity;
 
 const DEFAULT_API_URL: &str = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
-const DEFAULT_MODEL: &str = "gemini-2.0-flash"; // Updated default model
+const DEFAULT_MODEL: &str = "gemini-2.0-flash";
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub struct GeminiClient {
@@ -16,6 +17,7 @@ pub struct GeminiClient {
     api_url: String,
     model: String,
     config: ModelConfig,
+    verbosity: Verbosity,
 }
 
 #[derive(Debug, Serialize)]
@@ -83,6 +85,7 @@ pub struct GeminiClientBuilder {
     api_url: String,
     model: String,
     config: ModelConfig,
+    verbosity: Verbosity,
 }
 
 impl GeminiClientBuilder {
@@ -92,6 +95,7 @@ impl GeminiClientBuilder {
             api_url: DEFAULT_API_URL.to_string(),
             model: DEFAULT_MODEL.to_string(),
             config: ModelConfig::default(),
+            verbosity: Verbosity::default(),
         }
     }
 
@@ -110,6 +114,11 @@ impl GeminiClientBuilder {
         self
     }
 
+    pub fn with_verbosity(mut self, verbosity: Verbosity) -> Self {
+        self.verbosity = verbosity;
+        self
+    }
+
     pub fn build(self) -> GeminiClient {
         let client = Client::builder()
             .timeout(DEFAULT_TIMEOUT)
@@ -122,6 +131,7 @@ impl GeminiClientBuilder {
             api_url: self.api_url,
             model: self.model,
             config: self.config,
+            verbosity: self.verbosity,
         }
     }
 }
@@ -131,11 +141,22 @@ impl GeminiClient {
         GeminiClientBuilder::new(api_key)
     }
 
+    fn get_system_prompt(&self) -> &str {
+        match self.verbosity {
+            Verbosity::Concise => "Be concise and to the point. Provide only essential information without unnecessary details or explanations.",
+            Verbosity::Normal => "Provide balanced responses with moderate detail.",
+            Verbosity::Detailed => "Provide detailed and comprehensive responses with thorough explanations and examples where appropriate.",
+        }
+    }
+
     fn build_request(&self, prompt: &str) -> GeminiRequest {
+        let system_prompt = self.get_system_prompt();
+        let combined_prompt = format!("{}\n\nUser request: {}", system_prompt, prompt);
+
         GeminiRequest {
             contents: vec![Content {
                 parts: vec![Part {
-                    text: prompt.to_string(),
+                    text: combined_prompt,
                 }],
             }],
             max_tokens: self.config.max_tokens,
@@ -181,13 +202,10 @@ impl LLMApi for GeminiClient {
         let request = self.build_request(prompt);
         let url = self.get_api_url();
         
-        // eprintln!("Sending request to URL: {}", url);
-        // eprintln!("Request body: {}", serde_json::to_string_pretty(&request).unwrap());
-        
         let response = self.client
             .post(&url)
             .json(&request)
-            .query(&[("key", self.api_key.clone())]) // Add API key as query parameter
+            .query(&[("key", self.api_key.clone())])
             .send()
             .await
             .map_err(ApiError::Network)?;
@@ -220,14 +238,11 @@ impl LLMApi for GeminiClient {
     async fn send_streaming_query(&self, prompt: &str) -> ApiResult<StreamingResponse> {
         let request = self.build_request(prompt);
         let url = self.get_api_url();
-        
-        eprintln!("Sending streaming request to URL: {}", url);
-        eprintln!("Streaming request body: {}", serde_json::to_string_pretty(&request).unwrap());
 
         let response = self.client
             .post(&url)
             .json(&request)
-            .query(&[("key", self.api_key.clone())]) // Add API key as query parameter
+            .query(&[("key", self.api_key.clone())])
             .send()
             .await
             .map_err(ApiError::Network)?;
@@ -266,7 +281,7 @@ impl LLMApi for GeminiClient {
         let response = self.client
             .post(&url)
             .json(&request)
-            .query(&[("key", self.api_key.clone())]) // Add API key as query parameter
+            .query(&[("key", self.api_key.clone())])
             .send()
             .await
             .map_err(ApiError::Network)?;
@@ -331,7 +346,7 @@ mod tests {
             .with_api_url(mock_server.uri())
             .build();
 
-        let result = client.send_query("Hi").await;
+        let result = client.validate_key().await;
         assert!(matches!(result, Err(ApiError::InvalidKey)));
     }
 }

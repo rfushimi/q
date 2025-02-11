@@ -21,6 +21,17 @@ pub enum ApiError {
     Other(String),
 }
 
+impl ApiError {
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            ApiError::Network(_) => true,
+            ApiError::RateLimit => true,
+            ApiError::InvalidKey => false,
+            ApiError::Other(_) => false,
+        }
+    }
+}
+
 pub type ApiResult<T> = Result<T, ApiError>;
 pub type StreamingResponse = Pin<Box<dyn Stream<Item = ApiResult<String>> + Send>>;
 

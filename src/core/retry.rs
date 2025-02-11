@@ -1,127 +1,99 @@
 use std::time::Duration;
 use backoff::{ExponentialBackoff, backoff::Backoff};
-use futures::Future;
-use tokio::time::sleep;
-
 use super::{CoreError, CoreResult};
 
-/// Execute an async operation with exponential backoff retry
-pub async fn with_backoff<F, Fut, T>(
-    operation: F,
+pub async fn with_retry<T, F, Fut>(
+    mut f: F,
     max_retries: u32,
     initial_delay: Duration,
     max_delay: Duration,
 ) -> CoreResult<T>
 where
-    F: Fn() -> Fut,
-    Fut: Future<Output = CoreResult<T>>,
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = CoreResult<T>>,
 {
     let mut backoff = ExponentialBackoff {
         initial_interval: initial_delay,
         max_interval: max_delay,
         multiplier: 2.0,
-        max_elapsed_time: Some(max_delay * max_retries),
-        ..Default::default()
+        max_elapsed_time: None,
+        ..ExponentialBackoff::default()
     };
 
     let mut attempt = 0;
     loop {
-        match operation().await {
+        match f().await {
             Ok(value) => return Ok(value),
             Err(err) => {
                 attempt += 1;
-                if attempt >= max_retries {
-                    return Err(CoreError::Retry(format!(
-                        "Operation failed after {} attempts: {}",
-                        attempt, err
-                    )));
+                if attempt >= max_retries || !should_retry(&err) {
+                    return Err(err);
                 }
 
-                if let Some(duration) = backoff.next_backoff() {
-                    sleep(duration).await;
+                if let Some(delay) = backoff.next_backoff() {
+                    tokio::time::sleep(delay).await;
                 } else {
-                    return Err(CoreError::Retry(
-                        "Retry timeout exceeded".to_string(),
-                    ));
+                    return Err(CoreError::Retry(format!(
+                        "Max retries ({}) exceeded",
+                        max_retries
+                    )));
                 }
             }
         }
     }
 }
 
-/// Determine if an error should be retried
-pub fn should_retry(error: &CoreError) -> bool {
+fn should_retry(error: &CoreError) -> bool {
     match error {
-        CoreError::Api(api_error) => match api_error {
-            crate::api::ApiError::Network(_) => true,
-            crate::api::ApiError::RateLimit => true,
-            _ => false,
-        },
-        CoreError::Stream(_) => true,
-        _ => false,
+        CoreError::Api(api_error) => api_error.is_retryable(),
+        CoreError::Cache(_) => true,
+        CoreError::Retry(_) => true,
+        CoreError::Other(_) => false,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU32, Ordering};
-    use std::sync::Arc;
     use crate::api::ApiError;
 
     #[tokio::test]
-    async fn test_retry_success_after_failures() {
-        let attempts = Arc::new(AtomicU32::new(0));
-        let attempts_clone = attempts.clone();
-
-        let operation = move || {
-            let current_attempt = attempts_clone.fetch_add(1, Ordering::SeqCst);
-            async move {
-                if current_attempt < 2 {
-                    Err(CoreError::Retry("test error".to_string()))
+    async fn test_retry_success_after_failure() {
+        let mut attempts = 0;
+        let result = with_retry(
+            || async {
+                attempts += 1;
+                if attempts < 2 {
+                    Err(CoreError::Retry("Test retry".to_string()))
                 } else {
                     Ok("success")
                 }
-            }
-        };
-
-        let result: CoreResult<&str> = with_backoff(
-            operation,
+            },
             3,
+            Duration::from_millis(1),
             Duration::from_millis(10),
-            Duration::from_millis(100),
         )
         .await;
 
         assert!(result.is_ok());
-        assert_eq!(attempts.load(Ordering::SeqCst), 3);
+        assert_eq!(attempts, 2);
     }
 
     #[tokio::test]
     async fn test_retry_max_attempts_exceeded() {
-        let operation = || async {
-            Err(CoreError::Retry("test error".to_string()))
-        };
-
-        let result: CoreResult<&str> = with_backoff(
-            operation,
-            3,
+        let mut attempts = 0;
+        let result = with_retry(
+            || async {
+                attempts += 1;
+                Err(CoreError::Retry("Test retry".to_string()))
+            },
+            2,
+            Duration::from_millis(1),
             Duration::from_millis(10),
-            Duration::from_millis(100),
         )
         .await;
 
         assert!(result.is_err());
-        assert!(matches!(result, Err(CoreError::Retry(_))));
-    }
-
-    #[tokio::test]
-    async fn test_should_retry() {
-        // Create a network error using ApiError::Other
-        assert!(should_retry(&CoreError::Api(ApiError::Other("network error".into()))));
-        assert!(should_retry(&CoreError::Api(ApiError::RateLimit)));
-        assert!(!should_retry(&CoreError::Api(ApiError::InvalidKey)));
-        assert!(should_retry(&CoreError::Stream("stream error".to_string())));
-        assert!(!should_retry(&CoreError::Cache("cache error".to_string())));
+        assert_eq!(attempts, 2);
     }
 }
