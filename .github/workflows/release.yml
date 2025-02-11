@@ -16,14 +16,15 @@ jobs:
     steps:
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          name: Release ${{ github.ref }}
           draft: false
           prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-and-upload:
     needs: create-release
@@ -42,19 +43,13 @@ jobs:
             platform: linux
             sha_cmd: sha256sum
     runs-on: ${{ matrix.os }}
-    outputs:
-      sha256: ${{ steps.sha.outputs.sha256 }}
-      platform: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
       
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          target: ${{ matrix.target }}
-          override: true
+          targets: ${{ matrix.target }}
           
       - name: Build Release
         uses: actions-rs/cargo@v1
@@ -70,25 +65,14 @@ jobs:
           echo "sha256=$(cut -d ' ' -f 1 < q.sha256)" >> $GITHUB_OUTPUT
           
       - name: Upload Binary
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./target/${{ matrix.target }}/release/q
-          asset_name: q${{ matrix.artifact_suffix }}
-          asset_content_type: application/octet-stream
+          files: |
+            target/${{ matrix.target }}/release/q
+            target/${{ matrix.target }}/release/q.sha256
           
-      - name: Upload SHA256
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./target/${{ matrix.target }}/release/q.sha256
-          asset_name: q${{ matrix.artifact_suffix }}.sha256
-          asset_content_type: text/plain
-
       # Store SHA256 for macOS build
       - name: Store macOS SHA256
         if: matrix.platform == 'macos'
@@ -98,7 +82,7 @@ jobs:
       
       - name: Upload macOS SHA256 Artifact
         if: matrix.platform == 'macos'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: macos_sha256
           path: ./artifacts/macos_sha256
@@ -109,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download macOS SHA256
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: macos_sha256
           path: ./artifacts
