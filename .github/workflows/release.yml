@@ -10,7 +10,9 @@ permissions:
 
 jobs:
   create-release:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
+    outputs:
+      sha256: ${{ steps.sha.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v4
       
@@ -22,6 +24,13 @@ jobs:
           
       - name: Build Release
         run: cargo build --release
+        
+      - name: Calculate SHA256
+        id: sha
+        run: |
+          cd target/release
+          sha256sum q > q.sha256
+          echo "sha256=$(cat q.sha256 | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
         
       - name: Create Release
         id: create_release
@@ -44,20 +53,42 @@ jobs:
           asset_name: q
           asset_content_type: application/octet-stream
           
-      - name: Create Source Archive
-        run: |
-          # Create source tarball excluding target directory and other build artifacts
-          tar --exclude='.git' --exclude='target' --exclude='.github' -czf q-${{ github.ref_name }}.tar.gz .
-          # Calculate SHA256
-          sha256sum q-${{ github.ref_name }}.tar.gz > q-${{ github.ref_name }}.tar.gz.sha256
-          
-          
       - name: Upload SHA256
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./q-${{ github.ref_name }}.tar.gz.sha256
-          asset_name: q-${{ github.ref_name }}.tar.gz.sha256
+          asset_path: ./target/release/q.sha256
+          asset_name: q.sha256
           asset_content_type: text/plain
+
+  update-homebrew:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout homebrew-tools
+        uses: actions/checkout@v4
+        with:
+          repository: rfushimi/homebrew-tools
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+          path: homebrew-tools
+
+      - name: Update Formula
+        run: |
+          cd homebrew-tools
+          # Extract version from tag
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"  # Remove 'v' prefix
+          
+          # Update formula
+          sed -i "s|url.*|url \"https://github.com/rfushimi/q/releases/download/${{ github.ref_name }}/q\"|" Formula/q.rb
+          sed -i "s|sha256.*|sha256 \"${{ needs.create-release.outputs.sha256 }}\"|" Formula/q.rb
+          sed -i "s|version.*|version \"${VERSION}\"|" Formula/q.rb
+          
+          # Commit and push changes
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add Formula/q.rb
+          git commit -m "q: update to ${{ github.ref_name }}"
+          git push
