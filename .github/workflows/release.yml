@@ -10,44 +10,12 @@ permissions:
 
 jobs:
   create-release:
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-            artifact_suffix: ''
-            platform: macos
-          - os: ubuntu-latest
-            artifact_suffix: '-linux'
-            platform: linux
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     outputs:
-      macos_sha256: ${{ steps.sha.outputs.sha256 }}
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          
-      - name: Build Release
-        run: cargo build --release
-        
-      - name: Calculate SHA256
-        id: sha
-        run: |
-          cd target/release
-          if [ "${{ matrix.platform }}" = "macos" ]; then
-            shasum -a 256 q > q.sha256
-          else
-            sha256sum q > q.sha256
-          fi
-          echo "sha256=$(cut -d ' ' -f 1 < q.sha256)" >> $GITHUB_OUTPUT
-          
       - name: Create Release
         id: create_release
-        if: matrix.platform == 'macos'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -56,14 +24,58 @@ jobs:
           release_name: Release ${{ github.ref }}
           draft: false
           prerelease: false
+
+  build-and-upload:
+    needs: create-release
+    strategy:
+      fail-fast: false  # Continue with other platforms if one fails
+      matrix:
+        include:
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_suffix: ''
+            platform: macos
+            sha_cmd: shasum -a 256
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_suffix: '-linux'
+            platform: linux
+            sha_cmd: sha256sum
+    runs-on: ${{ matrix.os }}
+    outputs:
+      sha256: ${{ steps.sha.outputs.sha256 }}
+      platform: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+          
+      - name: Build Release
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target ${{ matrix.target }}
+        
+      - name: Calculate SHA256
+        id: sha
+        run: |
+          cd target/${{ matrix.target }}/release
+          ${{ matrix.sha_cmd }} q > q.sha256
+          echo "sha256=$(cut -d ' ' -f 1 < q.sha256)" >> $GITHUB_OUTPUT
           
       - name: Upload Binary
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./target/release/q
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./target/${{ matrix.target }}/release/q
           asset_name: q${{ matrix.artifact_suffix }}
           asset_content_type: application/octet-stream
           
@@ -72,15 +84,40 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./target/release/q.sha256
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./target/${{ matrix.target }}/release/q.sha256
           asset_name: q${{ matrix.artifact_suffix }}.sha256
           asset_content_type: text/plain
 
+      # Store SHA256 for macOS build
+      - name: Store macOS SHA256
+        if: matrix.platform == 'macos'
+        run: |
+          mkdir -p ./artifacts
+          echo "${{ steps.sha.outputs.sha256 }}" > ./artifacts/macos_sha256
+      
+      - name: Upload macOS SHA256 Artifact
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v3
+        with:
+          name: macos_sha256
+          path: ./artifacts/macos_sha256
+          retention-days: 1
+
   update-homebrew:
-    needs: create-release
+    needs: build-and-upload
     runs-on: ubuntu-latest
     steps:
+      - name: Download macOS SHA256
+        uses: actions/download-artifact@v3
+        with:
+          name: macos_sha256
+          path: ./artifacts
+
+      - name: Read macOS SHA256
+        id: sha
+        run: echo "macos_sha256=$(cat ./artifacts/macos_sha256)" >> $GITHUB_OUTPUT
+
       - name: Checkout homebrew-tools
         uses: actions/checkout@v4
         with:
@@ -97,7 +134,7 @@ jobs:
           
           # Update formula using perl instead of sed for better cross-platform compatibility
           perl -i -pe "s|url.*|url \"https://github.com/rfushimi/q/releases/download/${{ github.ref_name }}/q\"|" Formula/q.rb
-          perl -i -pe "s|sha256.*|sha256 \"${{ needs.create-release.outputs.macos_sha256 }}\"|" Formula/q.rb
+          perl -i -pe "s|sha256.*|sha256 \"${{ steps.sha.outputs.macos_sha256 }}\"|" Formula/q.rb
           perl -i -pe "s|version.*|version \"${VERSION}\"|" Formula/q.rb
           
           # Commit and push changes
